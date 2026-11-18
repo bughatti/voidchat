@@ -1,5 +1,9 @@
 # VoidChat Changelog
 
+## 0.1.1 — 2026-11-18
+
+- **Loot lines show once.** On WoW Forever every item you got, bought or made ("You receive item", "You create") showed twice in the window. Only the display was doubled: you got each item once.
+
 ## 0.1.0 — 2026-11-17
 
 - **Edit your tabs like Blizzard's:** right-click a tab to rename it, choose what it shows (message groups and each channel by name), move it, hide it, or make a new tab. The settings gear lists every tab to bring a hidden one back.

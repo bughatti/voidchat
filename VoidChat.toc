@@ -2,7 +2,7 @@
 ## Title: |cff00c7ffVoidChat|r
 ## Notes: A cleaner chat window: tabs, copy any line, search, one tab per whisper, and all Void addon lines in their own tab
 ## Author: Vede
-## Version: 0.1.0
+## Version: 0.1.1
 ## SavedVariables: VoidChatUIDB
 ## SavedVariablesPerCharacter: VoidChatCharDB
 ## IconTexture: Interface\Icons\INV_Letter_15

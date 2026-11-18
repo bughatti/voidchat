@@ -114,6 +114,15 @@ local function typeOfID(id)
     return idToType[id]
 end
 
+-- Loot is read from its event AND Blizzard's frame shows it (Forever: AddMessage(arg1, r, g, b, info.id),
+-- no event name). When the number isn't turned back into LOOT, the frame's copy got in as a second line
+-- (the user, 2026-11-18: "You receive item: [Crystal Vial]x5" twice for one stack bought). Both copies
+-- arrive in the same frame-time, in either order: the text is the match.
+local lootNow, lootFromEvent, fromFrame = nil, {}, {}
+local function lootKeys(now)
+    if now ~= lootNow then lootNow = now; wipe(lootFromEvent); wipe(fromFrame) end
+end
+
 local function onAdd(frame, text, r, g, b, chatTypeID, accessID, typeID, event, eventArgs)
     if type(text) == "nil" then return end
     local secretText = ns.Secret(text)
@@ -126,6 +135,7 @@ local function onAdd(frame, text, r, g, b, chatTypeID, accessID, typeID, event, 
     if ns.LOOT_EVENTS[ev or ""] then return end          -- read from the event itself
     local now = GetTime()
     resetFrameKeys(now)
+    lootKeys(now)
 
     local lineID = type(eventArgs) == "table" and eventArgs[11] or nil
     if ns.Secret(lineID) then lineID = nil end
@@ -149,6 +159,11 @@ local function onAdd(frame, text, r, g, b, chatTypeID, accessID, typeID, event, 
         frameCount[k] = n
         if n <= (taken[key] or 0) then return end
         taken[key] = n
+        -- the loot event already stored this text this frame-time: this is its frame copy
+        if not secretText and (lootFromEvent[text] or 0) > 0 then
+            lootFromEvent[text] = lootFromEvent[text] - 1
+            return
+        end
     end
     -- A print with no chat type: which addon printed it? The call stack names the file. Every
     -- Void addon's line goes to the Void tab, whatever its prefix (VoidDev's "Layer stayed ..."
@@ -163,7 +178,14 @@ local function onAdd(frame, text, r, g, b, chatTypeID, accessID, typeID, event, 
         end
     end
     local line = store(text, r, g, b, ev, eventArgs, fromVoid and "void" or nil)
-    if not secretText then line.raw = text end
+    if not secretText then
+        line.raw = text
+        if not given and not fromVoid then           -- a loot event may still come for it
+            local q = fromFrame[text] or {}
+            q[#q + 1] = line
+            fromFrame[text] = q
+        end
+    end
 end
 
 -- Line IDs older than 5 minutes are dropped (they only matter within a frame).
@@ -218,11 +240,26 @@ loot:SetScript("OnEvent", function(_, event, ...)
         if lootSeen[lineID] then return end
         lootSeen[lineID] = true
     end
+    local secret = ns.Secret(text)
+    if not secret then
+        lootKeys(GetTime())
+        -- a frame already showed this line this frame-time (as a plain line): make that one the loot line
+        local q = fromFrame[text]
+        local old = q and table.remove(q, 1)
+        if old then
+            local kind, chatType = ns.KindOf(event, text)
+            old.kind, old.chatType = kind, chatType
+            old.looter = ns.ShortName(args[2])
+            if ns.Redraw then ns.Redraw() end
+            return
+        end
+        lootFromEvent[text] = (lootFromEvent[text] or 0) + 1
+    end
     local info = _G.ChatTypeInfo and _G.ChatTypeInfo[event:sub(10)]
     local r, g, b = 0, 0.67, 0
     if info and type(info.r) == "number" then r, g, b = info.r, info.g, info.b end
     local line = store(text, r, g, b, event, args)
-    if not ns.Secret(text) then line.raw = text end
+    if not secret then line.raw = text end
 end)
 
 -- Lines Blizzard already showed before we loaded (the login burst): copy them in once.
