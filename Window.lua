@@ -538,8 +538,40 @@ function ns.Build()
     body:SetHyperlinksEnabled(true)
     body:EnableMouse(true)
     body:EnableMouseWheel(true)
+    -- Right-click a name for the player menu (Whisper, Invite, Target...). The user, 2026-11-22: right-clicking a
+    -- name in General did "nothing at all". Logged in game: the click did reach SetItemRef, but on WoW Forever the
+    -- player menu is attached to the chat frame it's given (FriendsFrame_ShowDropdown: ownerFrame = chatFrame) and a
+    -- menu closes the moment its owner isn't visible (Blizzard_Menu: "if not ownerRegion:IsVisible() then
+    -- CloseMenu"). We passed Blizzard's chat frame, which VoidChat hides: the menu opened and closed in one frame.
+    -- So for a player's or Battle.net friend's name VoidChat opens that same menu the way Blizzard's link handlers do
+    -- (ItemRefHandlers: FriendsFrame_ShowDropdown / ShowBNDropdown) but with the owner set apart: this window (shown)
+    -- owns the menu, Blizzard's chat frame stays the chat frame (its menu actions "Move to whisper window" read its
+    -- messages: Sol 11-22). Any other link, a shift-right-click (put the name in chat), or no UnitPopup: as before.
+    if type(VoidChatUIDB) == "table" then VoidChatUIDB._dbgRC = nil end   -- the 11-22 debug log
+    local function openPlayerMenu(owner, link)
+        if type(_G.UnitPopup_OpenMenu) ~= "function" or type(link) ~= "string" or ns.Secret(link) then return false end
+        local kind, opts = link:match("^(%a+):(.*)$")
+        local chatFrame = _G.DEFAULT_CHAT_FRAME
+        if kind == "player" then
+            local name, lineID, chatType = strsplit(":", opts)
+            if not name or name == "" then return false end
+            _G.UnitPopup_OpenMenu("FRIEND", { name = name, lineID = lineID, chatType = chatType, chatTarget = name,
+                chatFrame = chatFrame, ownerFrame = owner })
+            return true
+        elseif kind == "BNplayer" then
+            local name, bnetIDAccount, _, chatType = strsplit(":", opts)
+            if not name or name == "" or not bnetIDAccount then return false end
+            if _G.BNIsSelf and _G.BNIsSelf(bnetIDAccount) then return true end   -- Blizzard shows no menu for you
+            -- no line ID, as Blizzard's own BN handler (ItemRefHandlersShared) passes none
+            _G.UnitPopup_OpenMenu("BN_FRIEND", { name = name, chatType = chatType, chatTarget = name,
+                chatFrame = chatFrame, bnetIDAccount = bnetIDAccount, ownerFrame = owner })
+            return true
+        end
+        return false
+    end
     body:SetScript("OnHyperlinkClick", function(self, link, text, button)
         W.linkClicked = GetTime()
+        if button == "RightButton" and not IsModifiedClick("CHATLINK") and openPlayerMenu(self, link) then return end
         SetItemRef(link, text, button, _G.DEFAULT_CHAT_FRAME)
     end)
     body:SetScript("OnHyperlinkEnter", function(self, link)
